@@ -73,7 +73,13 @@ export default function Home() {
 
   // Form state: selected location index and wait value
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [waitValue, setWaitValue] = useState(getAverage(initialLocations[0].waits));
+  // Use an empty string for waitValue, so input stays empty and doesn't "jump" to 0 when focused and helps UX for controlled numeric fields
+  const [waitValue, setWaitValue] = useState("");
+
+  // On mount, set initial value to empty string
+  useEffect(() => {
+    setWaitValue(""); // Keep wait input empty on page load
+  }, []);
 
   // Load location data from localStorage (if present) on first render
   useEffect(() => {
@@ -94,7 +100,7 @@ export default function Home() {
         ) {
           setLocations(data);
           setSelectedIdx(0);
-          setWaitValue(getAverage(data[0].waits));
+          setWaitValue(""); // Do not auto-fill with average, start empty for better UX
         }
       } catch (err) {
         // If parse error, just use default
@@ -115,30 +121,38 @@ export default function Home() {
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const idx = parseInt(e.target.value, 10);
     setSelectedIdx(idx);
-    setWaitValue(getAverage(locations[idx].waits));
+    setWaitValue(""); // Clear input for new selection
   };
 
-  // Handle wait time input changes
+  // Handle wait time input changes (controlled as string)
   const handleWaitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setWaitValue(Number(e.target.value));
+    // Only allow digits or empty string (for partial/deleting)
+    if (e.target.value === "" || /^\d+$/.test(e.target.value)) {
+      setWaitValue(e.target.value);
+    }
   };
 
   // On form submit, push new wait time into array and update lastUpdated
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (waitValue.trim() === "" || isNaN(Number(waitValue))) {
+      return;
+    }
+    const waitNum = Number(waitValue);
     setLocations(prev =>
       prev.map((loc, idx) =>
         idx === selectedIdx
           ? {
               ...loc,
-              waits: [...loc.waits, Number(waitValue)],
+              waits: [...loc.waits, waitNum],
               lastUpdated: now(), // Update timestamp to now
             }
           : loc
       )
     );
-    // Optionally, update input value to the average again for feedback:
-    // setWaitValue(getAverage([...locations[selectedIdx].waits, Number(waitValue)]));
+    setWaitValue(""); // Reset input to empty after submit
+    // Optionally, update input value to the average again for feedback (not needed)
+    // setWaitValue(getAverage([...locations[selectedIdx].waits, waitNum]).toString());
   };
 
   return (
@@ -225,12 +239,13 @@ export default function Home() {
               id="wait-input"
               type="number"
               min={0}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10 transition"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              // Use a controlled input with value as a string, so the field doesn't "jump to 0" when focused/emptied.
               value={waitValue}
               onChange={handleWaitChange}
               required
-              inputMode="numeric"
-              pattern="[0-9]*"
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10 transition"
             />
           </div>
           {/* Submit button */}
